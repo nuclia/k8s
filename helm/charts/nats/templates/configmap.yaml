@@ -251,9 +251,13 @@ data:
         account: {{ . | quote }}
         {{- end }}
 
+        {{- if .credentials -}}
         {{- with .credentials }}
         credentials: "/etc/nats-creds/{{ .secret.name }}/{{ .secret.key }}"
         {{- end }}
+        {{- else if .credentialsFile }}
+        credentials: "/etc/nats-creds/{{ .credentialsFile }}"
+        {{- end -}}
 
         {{- with .tls }}
         tls: {
