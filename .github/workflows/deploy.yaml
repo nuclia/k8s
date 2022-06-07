@@ -1,0 +1,52 @@
+name: deploy helm chart (kspan)
+
+on:
+  push:
+    branches:
+      - nuclia
+    paths:
+      - ".github/workflows/**"
+      - "helm/charts/nats/**"
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+jobs:
+  deploy:
+    name: Deploy Helm chart
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Enable tmate debugging of manually-triggered workflows if the input option was provided
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
+
+      - name: Set helm package image
+        id: version_step
+        run: |-
+          VERSION=`grep "version" helm/charts/nats/Chart.yaml | grep -Eo "[0-9]+\.[0-9]+\.[0-9]+"`
+          echo "::set-output name=version_number::$VERSION"
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.4.0
+
+      - name: Push helm package
+        run: |-
+          helm lint helm/charts/nats
+          helm package helm/charts/nats
+          curl --data-binary "@nats-${{ steps.version_step.outputs.version_number }}.tgz" ${{ secrets.HELM_CHART_URL }}/api/charts
+
